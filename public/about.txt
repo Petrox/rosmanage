@@ -1,0 +1,1 @@
+This is rosmanage a webapp written in go to handle the initialization of a multinode ros network
