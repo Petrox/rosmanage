@@ -1,9 +1,6 @@
 package main
 
-import (
-	"fmt"
-	"time"
-)
+import "time"
 
 /*type Host struct {
 	IP        string
@@ -18,10 +15,17 @@ import (
 // var Render = render.New(render.Options{IsDevelopment: true})
 
 func main() {
-	GetInterfaces()
-	stdout, stderr, err := CommandRunner("hello\nhellopetros\nhi", time.Second, "grep", "hello")
+	updateNetworks()
+	ticker := time.NewTicker(time.Second * 5)
+	go func() {
+		for range ticker.C {
+			updateNetworks()
+		}
+	}()
+	time.Sleep(time.Second * 20)
+	// stdout, stderr, err := CommandRunner("hello\nhellopetros\nhi", time.Second, "grep", "hello")
 
-	fmt.Printf("stdout: %v\n stderr: %v\nerr: %v\n", stdout, stderr, err)
+	// fmt.Printf("stdout: %v\n stderr: %v\nerr: %v\n", stdout, stderr, err)
 	/*
 		r := httprouter.New()
 		r.GET("/hello/:name", hello)
