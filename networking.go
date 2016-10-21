@@ -4,6 +4,8 @@ import (
 	"log"
 	"net"
 	"os/exec"
+	"strconv"
+	"strings"
 	"time"
 )
 
@@ -12,10 +14,25 @@ type Network struct {
 	network     string
 	firstseen   time.Time
 	lastscanned time.Time
+	hostok      map[string]Host
+}
+
+// Host contains details of a known remote host
+type Host struct {
+	addr        string
+	rosroles    string
+	islocalhost bool
+	ispreferred bool
+	openports   []int16
+	firstseen   time.Time
+	lastscanned time.Time
 }
 
 // KnownNetworks contains all the Networks we can access
 var KnownNetworks = make(map[string]Network)
+
+// KnownHosts containt all the Hosts we can access
+var KnownHosts = make(map[string]Host)
 
 func getNetworks() map[string]Network {
 
@@ -26,7 +43,7 @@ func getNetworks() map[string]Network {
 		addrs, _ := iface.Addrs()
 		if len(addrs) > 0 && (iface.Flags&net.FlagUp) > 0 {
 			// fmt.Printf("%s : %s\n", iface.Name, addrs[0])
-			thisnet := Network{network: addrs[0].String()}
+			thisnet := Network{network: addrs[0].String(), hostok: make(map[string]Host)}
 			nets[iface.Name] = thisnet
 		}
 	}
@@ -58,10 +75,101 @@ func updateNetworks() {
 	}
 }
 
-func scanHosts(halo Network) {
-	process := exec.Command("nmap", "-n", "-oG -", "-sT", halo.network, "-p 22,11311")
-	process.Run()
-	process.CombinedOutput()
+func scanNetworks() {
+	for index, halo := range KnownNetworks {
+		if time.Since(halo.lastscanned) > cfgNetworkscanning {
+			halo.lastscanned = time.Now()
+			KnownNetworks[index] = halo
+			go updateHosts(halo)
+		}
+	}
+}
+
+func updateHosts(halo Network) {
+	hostok := scanHosts(halo)
+	for addr, host := range hostok {
+		if val, ok := halo.hostok[addr]; ok == false {
+			log.Println("Host found:", addr)
+			host.firstseen = time.Now()
+			halo.hostok[addr] = host
+		} else {
+			val.openports = host.openports
+			val.islocalhost = host.islocalhost
+			val.ispreferred = host.ispreferred
+			halo.hostok[addr] = val
+		}
+	}
+	for addr := range halo.hostok {
+		if _, ok := hostok[addr]; ok == false {
+			log.Println("Host down:", addr)
+			delete(halo.hostok, addr)
+		}
+	}
+}
+func scanHosts(halo Network) map[string]Host {
+	beginning := time.Now()
+	var hostok = make(map[string]Host)
+	halo.lastscanned = time.Now()
+	networksimplified := halo.network
+	networkparts := strings.Split(networksimplified, "/")
+	if networkparts[0] == "127.0.0.1" {
+		networksimplified = "127.0.0.1/32"
+	} else {
+		var netmaskslashnew int64 = 24
+		netmaskslashoriginal, _ := strconv.ParseInt(networkparts[1], 10, 32)
+		if netmaskslashoriginal > 24 {
+			netmaskslashnew = netmaskslashoriginal
+		}
+		networksimplified = networkparts[0] + "/" + strconv.Itoa(int(netmaskslashnew))
+	}
+	/*	if networksimplified != halo.network {
+			log.Println("Network scanning start:", networksimplified)
+		} else {
+			log.Println("Network scanning (simplified) start:", networksimplified)
+		}
+	*/
+	process := exec.Command("nmap", "-n", "-oG", "-", "-sT", networksimplified, "-p 22,11311")
+	output, err := process.CombinedOutput()
+	if err != nil {
+		log.Printf("Nmap error: %v\n", err)
+	}
+	//	log.Printf("Output: %v\n", string(output))
+	outputlines := strings.Split(string(output), "\n")
+	var goodlines []string
+	for _, line := range outputlines {
+		if !strings.HasPrefix(line, "#") && !strings.Contains(line, "Status: Up") {
+			goodlines = append(goodlines, line)
+		}
+	}
+	for _, line := range goodlines {
+		lineparts := strings.Split(line, " ")
+		if len(lineparts) > 3 {
+			var host Host
+			//			log.Println("lineparts", line, lineparts)
+			host.islocalhost = strings.HasPrefix(line, "Host: "+networkparts[0]+" ")
+			host.ispreferred = host.islocalhost && networkparts[0] != "127.0.0.1"
+			host.addr = lineparts[1]
+			var portcolumn = false
+			for _, column := range lineparts {
+				//				log.Println("portcolumn", portcolumn, column)
+				if strings.HasSuffix(column, ":") {
+					portcolumn = strings.Contains(column, "Ports:")
+				} else {
+					if portcolumn {
+						portpart := strings.Split(column, "/")
+						port, _ := strconv.Atoi(portpart[0])
+						host.openports = append(host.openports, int16(port))
+					}
+				}
+			}
+			hostok[host.addr] = host
+			// log.Printf("host %s\n", host.addr)
+		}
+	}
+	//	log.Println("Hostok: ", hostok)
+	log.Println("Network scanning ", networksimplified, "took", time.Since(beginning))
+	return hostok
+	// log.Printf("%v goodlines\n", goodlines)
 }
 
 // CommandRunner runs a command and returns with it's output later

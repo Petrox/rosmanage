@@ -2,6 +2,9 @@ package main
 
 import "time"
 
+const cfgInterfacepolling = time.Second * 2
+const cfgNetworkscanning = time.Second * 10
+
 /*type Host struct {
 	IP        string
 	Name      string
@@ -16,13 +19,17 @@ import "time"
 
 func main() {
 	updateNetworks()
-	ticker := time.NewTicker(time.Second * 5)
+	interfaceticker := time.NewTicker(cfgInterfacepolling)
 	go func() {
-		for range ticker.C {
+		for range interfaceticker.C {
 			updateNetworks()
+			scanNetworks()
 		}
 	}()
-	time.Sleep(time.Second * 20)
+
+	for {
+		time.Sleep(time.Second)
+	}
 	// stdout, stderr, err := CommandRunner("hello\nhellopetros\nhi", time.Second, "grep", "hello")
 
 	// fmt.Printf("stdout: %v\n stderr: %v\nerr: %v\n", stdout, stderr, err)
