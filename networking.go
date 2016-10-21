@@ -7,6 +7,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"golang.org/x/crypto/ssh"
 )
 
 // Network contains details about a network accessible to the app
@@ -14,18 +16,32 @@ type Network struct {
 	network     string
 	firstseen   time.Time
 	lastscanned time.Time
-	hostok      map[string]Host
+	hostok      map[string]*Host
+	props       properties
 }
 
 // Host contains details of a known remote host
 type Host struct {
 	addr        string
 	rosroles    string
+	rosid       string
 	islocalhost bool
 	ispreferred bool
-	openports   []int16
+	openports   map[int16]struct{}
 	firstseen   time.Time
 	lastscanned time.Time
+	client      sshClient
+	props       properties
+}
+
+type properties map[string]string
+
+type sshClient struct {
+	active   bool
+	client   ssh.Client
+	firsttry time.Time
+	lasttry  time.Time
+	props    properties
 }
 
 // KnownNetworks contains all the Networks we can access
@@ -43,7 +59,7 @@ func getNetworks() map[string]Network {
 		addrs, _ := iface.Addrs()
 		if len(addrs) > 0 && (iface.Flags&net.FlagUp) > 0 {
 			// fmt.Printf("%s : %s\n", iface.Name, addrs[0])
-			thisnet := Network{network: addrs[0].String(), hostok: make(map[string]Host)}
+			thisnet := Network{network: addrs[0].String(), hostok: make(map[string]*Host), props: make(properties)}
 			nets[iface.Name] = thisnet
 		}
 	}
@@ -92,6 +108,7 @@ func updateHosts(halo Network) {
 			log.Println("Host found:", addr)
 			host.firstseen = time.Now()
 			halo.hostok[addr] = host
+			host.startSSHClient()
 		} else {
 			val.openports = host.openports
 			val.islocalhost = host.islocalhost
@@ -106,9 +123,9 @@ func updateHosts(halo Network) {
 		}
 	}
 }
-func scanHosts(halo Network) map[string]Host {
+func scanHosts(halo Network) map[string]*Host {
 	beginning := time.Now()
-	var hostok = make(map[string]Host)
+	var hostok = make(map[string]*Host)
 	halo.lastscanned = time.Now()
 	networksimplified := halo.network
 	networkparts := strings.Split(networksimplified, "/")
@@ -149,6 +166,9 @@ func scanHosts(halo Network) map[string]Host {
 			host.islocalhost = strings.HasPrefix(line, "Host: "+networkparts[0]+" ")
 			host.ispreferred = host.islocalhost && networkparts[0] != "127.0.0.1"
 			host.addr = lineparts[1]
+			host.props = make(properties)
+			host.client.props = make(properties)
+			host.openports = make(map[int16]struct{})
 			var portcolumn = false
 			for _, column := range lineparts {
 				//				log.Println("portcolumn", portcolumn, column)
@@ -158,11 +178,11 @@ func scanHosts(halo Network) map[string]Host {
 					if portcolumn {
 						portpart := strings.Split(column, "/")
 						port, _ := strconv.Atoi(portpart[0])
-						host.openports = append(host.openports, int16(port))
+						host.openports[int16(port)] = struct{}{}
 					}
 				}
 			}
-			hostok[host.addr] = host
+			hostok[host.addr] = &host
 			// log.Printf("host %s\n", host.addr)
 		}
 	}
@@ -172,42 +192,22 @@ func scanHosts(halo Network) map[string]Host {
 	// log.Printf("%v goodlines\n", goodlines)
 }
 
-// CommandRunner runs a command and returns with it's output later
-func CommandRunner(stdin string, timeout time.Duration, cmd string, arg ...string) (stdout []string, stderr []string, err error) {
-	// process := exec.Command(cmd, arg...)
+func (h *Host) startSSHClient() bool {
+	_, ok := h.openports[22]
+	if !ok || h.client.active {
+		return false
+	}
 
-	/*	procstdin, err := process.StdinPipe()
-			if err != nil {
-				return nil, nil, err
-			}
-			procstdout, err := process.StdoutPipe()
-			if err != nil {
-				return nil, nil, err
-			}
-			procstderr, err := process.StderrPipe()
-			if err != nil {
-				return nil, nil, err
-			}
-			process.Start()
-			procstdin.Write([]byte(stdin))
-			procstdin.Close()
-			stdoutbytes, err := ioutil.ReadAll(procstdout)
-			if err != nil {
-				return nil, nil, err
-			}
-			stdout = strings.Split(string(stdoutbytes), "\n")
-			stderrbytes, err := ioutil.ReadAll(procstderr)
-			if err != nil {
-				return stdout, nil, err
-			}
-			stderr = strings.Split(string(stderrbytes), "\n")
+	log.Println("SSH client started", h.addr)
+	go sshClientWorker(h)
+	return true
+}
 
-			process.Wait()
-		process.Stdin = stdin
-		process.Run()
-		stdout = process.StdoutPipe()
-		stderr = process.Stderr
-		return stdout, stderr, nil
-	*/
-	return nil, nil, nil
+func (h *Host) stoppedSSHClient() bool {
+	log.Println("SSH client stopped", h.addr)
+	if !h.client.active {
+		return false
+	}
+	h.client.active = false
+	return true
 }

@@ -4,6 +4,7 @@ import "time"
 
 const cfgInterfacepolling = time.Second * 2
 const cfgNetworkscanning = time.Second * 10
+const cfgSSHRetry = time.Second * 300
 
 /*type Host struct {
 	IP        string
