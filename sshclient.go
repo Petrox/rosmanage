@@ -52,16 +52,7 @@ func sshClientWorker(h *Host) {
 		return
 	}
 	//var retval string
-	sshCommand(h, client, "/usr/bin/whoami")
-	lsbRelease, err := sshCommand(h, client, "lsb_release -a")
-	if err == nil {
-		h.props["lsb_release"] = lsbRelease
-	}
-	rosmanagerolestr, err := sshCommand(h, client, "cat .rosmanage.role")
-	if err == nil {
-		h.props["rosmanage.role"] = rosmanagerolestr
-	}
-
+	h.client.client = client
 	rosmanageuuidstr, err := sshCommand(h, client, "cat .rosmanage.uuid")
 	if err == nil {
 		h.props["rosmanage.uuid"] = rosmanageuuidstr
@@ -75,12 +66,35 @@ func sshClientWorker(h *Host) {
 		}
 	}
 
-	//return, _ = sshCommand(controlsession, h.addr, "/usr/bin/whoami")
-	//return, _ = sshCommand(controlsession, h.addr, "/usr/bin/whoami")
-	if err != nil {
+	h.setStaticProps()
+	h.setDynamicProps()
 
+}
+
+func (h *Host) setStaticProps() {
+	h.setPropsViaSSH("/usr/bin/whoami", "whoami")
+	h.setPropsViaSSH("lsusb", "lsusb")
+	h.setPropsViaSSH("lsb_release -a", "lsb_release -a")
+	h.setPropsViaSSH("uname -a", "uname -a")
+	h.setPropsViaSSH("hostname", "hostname")
+	h.setPropsViaSSH("dpkg --list ros*", "dpkg --list ros*")
+}
+
+func (h *Host) setDynamicProps() {
+	h.setPropsViaSSH("ifconfig", "ifconfig")
+	h.setPropsViaSSH("ps aux", "ps aux")
+	h.setPropsViaSSH("cat .rosmanage.role", "rosmanage.role")
+	h.setPropsViaSSH("cat /proc/meminfo", "meminfo")
+	h.setPropsViaSSH("cat /proc/cpuinfo", "cpuinfo")
+	h.setPropsViaSSH("which iperf", "which iperf")
+	h.setPropsViaSSH("which nmap", "which nmap")
+}
+
+func (h *Host) setPropsViaSSH(command string, key string) {
+	retval, err := sshCommand(h, h.client.client, command)
+	if err == nil {
+		h.props[key] = retval
 	}
-	time.Sleep(time.Second * 10)
 }
 
 func sshCommand(h *Host, client *ssh.Client, command string) (string, error) {

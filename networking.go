@@ -37,11 +37,13 @@ type Host struct {
 type properties map[string]string
 
 type sshClient struct {
-	active   bool
-	client   ssh.Client
-	firsttry time.Time
-	lasttry  time.Time
-	props    properties
+	active    bool
+	client    *ssh.Client
+	firsttry  time.Time
+	lasttry   time.Time
+	props     properties
+	chQuit    chan bool
+	chCommand chan string
 }
 
 // KnownNetworks contains all the Networks we can access
