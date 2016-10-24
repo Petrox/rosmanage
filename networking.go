@@ -52,6 +52,17 @@ var KnownNetworks = make(map[string]Network)
 // KnownHosts containt all the Hosts we can access
 var KnownHosts = make(map[string]Host)
 
+func networkmain() {
+	updateNetworks()
+	interfaceticker := time.NewTicker(cfgInterfacepolling)
+	go func() {
+		for range interfaceticker.C {
+			updateNetworks()
+			scanNetworks()
+		}
+	}()
+}
+
 func getNetworks() map[string]Network {
 
 	nets := make(map[string]Network)

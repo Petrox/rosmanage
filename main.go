@@ -19,28 +19,8 @@ const cfgSSHRetry = time.Second * 300
 // var Render = render.New(render.Options{IsDevelopment: true})
 
 func main() {
-	updateNetworks()
-	interfaceticker := time.NewTicker(cfgInterfacepolling)
-	go func() {
-		for range interfaceticker.C {
-			updateNetworks()
-			scanNetworks()
-		}
-	}()
-
-	for {
-		time.Sleep(time.Second)
-	}
-	// stdout, stderr, err := CommandRunner("hello\nhellopetros\nhi", time.Second, "grep", "hello")
-
-	// fmt.Printf("stdout: %v\n stderr: %v\nerr: %v\n", stdout, stderr, err)
-	/*
-		r := httprouter.New()
-		r.GET("/hello/:name", hello)
-		r.GET("/host", host)
-		n := negroni.Classic()
-		n.UseHandler(r)
-		n.Run(":3001")*/
+	networkmain()
+	httpmain()
 }
 
 /*
