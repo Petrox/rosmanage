@@ -11,8 +11,8 @@ import (
 
 type dashDataStruct struct {
 	Revision int
-	//	Networks map[string]Network
-	//	Hosts    map[string]Host
+	Networks map[string]Network
+	Hosts    map[string]Host
 }
 
 var htmlTemplates *template.Template
@@ -21,9 +21,9 @@ var dashTemplate *template.Template
 func webindex(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	var dashData dashDataStruct
 	log.Println("http", "webindex", r.RemoteAddr)
-	dashData.Revision = 1.0
-	//	dashData.Hosts = KnownHosts
-	//	dashData.Networks = KnownNetworks
+	dashData.Revision = 1
+	dashData.Hosts = KnownHosts
+	dashData.Networks = KnownNetworks
 	// dashTemplate.Execute(w, dashData)
 	dashTemplate.ExecuteTemplate(w, "dashboard", dashData)
 }
@@ -33,8 +33,11 @@ func webhello(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 }
 
 func httpmain() {
-	dashTemplate = template.New("dashboardlabel")
-	dashTemplate, _ = dashTemplate.ParseFiles("templates/dashboard.gotmpl")
+	var err error
+	dashTemplate, err = template.New("dashboardlabel").ParseFiles("templates/dashboard.gotmpl")
+	if err != nil {
+		log.Fatalln("template parsing error", err)
+	}
 	router := httprouter.New()
 	router.GET("/", webindex)
 	router.GET("/hello/:name", webhello)

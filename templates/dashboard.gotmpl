@@ -5,8 +5,10 @@
 {{template "leftsidebar" .}}
 {{template "maincontent" .}}
 {{template "structure footer" .}}
-{{template "footer" .}}
+{{template "footer" . }}
 {{end}}
+
+
 {{define "header"}}
 <!DOCTYPE html>
 <html lang="en">
@@ -19,7 +21,7 @@
     <meta name="author" content="">
     <link rel="icon" href="../../favicon.ico">
 
-    <title>RosManage {{revision}}</title>
+    <title>RosManage {{.Revision}}</title>
 
     <!-- Bootstrap core CSS -->
     <link href="../../dist/css/bootstrap.min.css" rel="stylesheet">
@@ -73,10 +75,17 @@
     <div class="container-fluid">
       <div class="row">
 {{end}}
+{{define "sidebar-hostelement"}}
+            <li><a href="#">.addr</a></li>
+
+{{end}}
 {{define "leftsidebar"}}
         <div class="col-sm-3 col-md-2 sidebar">
           <ul class="nav nav-sidebar">
             <li class="active"><a href="#">Overview <span class="sr-only">(current)</span></a></li>
+{{ range .Hosts}}
+            <li><a href="#">.Addr</a></li>
+{{ end}}            
             <li><a href="#">Reports</a></li>
             <li><a href="#">Analytics</a></li>
             <li><a href="#">Export</a></li>

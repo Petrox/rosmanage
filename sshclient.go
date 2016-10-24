@@ -36,7 +36,7 @@ func sshClientWorker(h *Host) {
 	//	proc := exec.Command("ssh", "-o TCPKeepAlive", h.addr)
 	key, err := getKeyFile()
 	if err != nil {
-		log.Println("SSH key error", h.addr, err.Error())
+		log.Println("SSH key error", h.Addr, err.Error())
 		return
 	}
 	usr, _ := user.Current()
@@ -46,23 +46,23 @@ func sshClientWorker(h *Host) {
 			ssh.PublicKeys(key),
 		},
 	}
-	client, err := ssh.Dial("tcp", h.addr+":22", config)
+	client, err := ssh.Dial("tcp", h.Addr+":22", config)
 	if err != nil {
-		log.Println("SSH connect error", h.addr, err.Error())
+		log.Println("SSH connect error", h.Addr, err.Error())
 		return
 	}
 	//var retval string
 	h.client.client = client
 	rosmanageuuidstr, err := sshCommand(h, client, "cat .rosmanage.uuid")
 	if err == nil {
-		h.props["rosmanage.uuid"] = rosmanageuuidstr
+		h.Props["rosmanage.uuid"] = rosmanageuuidstr
 	} else {
 		rosmanageuuid := uuid.New()
 		log.Println("UUID", rosmanageuuid.String())
 		sshCommand(h, client, "echo '"+rosmanageuuid.String()+"' > .rosmanage.uuid")
 		rosmanageuuidstr, err = sshCommand(h, client, "cat .rosmanage.uuid")
 		if err == nil {
-			h.props["rosmanage.uuid"] = rosmanageuuidstr
+			h.Props["rosmanage.uuid"] = rosmanageuuidstr
 		}
 	}
 
@@ -93,23 +93,23 @@ func (h *Host) setDynamicProps() {
 func (h *Host) setPropsViaSSH(command string, key string) {
 	retval, err := sshCommand(h, h.client.client, command)
 	if err == nil {
-		h.props[key] = retval
+		h.Props[key] = retval
 	}
 }
 
 func sshCommand(h *Host, client *ssh.Client, command string) (string, error) {
 	controlsession, err := client.NewSession()
 	if err != nil {
-		log.Println("SSH session error", h.addr, err.Error())
+		log.Println("SSH session error", h.Addr, err.Error())
 	}
 	defer controlsession.Close()
 	var b bytes.Buffer
 	controlsession.Stdout = &b
 	if err := controlsession.Run(command); err != nil {
-		log.Println("SSH command error", h.addr, command, err.Error())
+		log.Println("SSH command error", h.Addr, command, err.Error())
 		return "", err
 	}
-	log.Println("SSH command result", h.addr, command, b.String())
+	log.Println("SSH command result", h.Addr, command, b.String())
 	return b.String(), nil
 }
 
