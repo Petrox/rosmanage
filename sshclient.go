@@ -23,16 +23,16 @@ import (
 */
 
 func sshClientWorker(h *Host) {
-	if time.Since(h.client.firsttry) > time.Hour*365*24 {
-		h.client.firsttry = time.Now()
+	if time.Since(h.Client.FirstTry) > time.Hour*365*24 {
+		h.Client.FirstTry = time.Now()
 	} else {
-		if time.Since(h.client.lasttry) < cfgSSHRetry {
+		if time.Since(h.Client.LastTry) < cfgSSHRetry {
 			return
 		}
 	}
-	h.client.active = true
+	h.Client.Active = true
 	defer h.stoppedSSHClient()
-	h.client.lasttry = time.Now()
+	h.Client.LastTry = time.Now()
 	//	proc := exec.Command("ssh", "-o TCPKeepAlive", h.addr)
 	key, err := getKeyFile()
 	if err != nil {
@@ -52,7 +52,7 @@ func sshClientWorker(h *Host) {
 		return
 	}
 	//var retval string
-	h.client.client = client
+	h.Client.client = client
 	rosmanageuuidstr, err := sshCommand(h, client, "cat .rosmanage.uuid")
 	if err == nil {
 		h.Props["rosmanage.uuid"] = rosmanageuuidstr
@@ -67,7 +67,8 @@ func sshClientWorker(h *Host) {
 	}
 
 	h.setStaticProps()
-	h.setDynamicProps()
+	h.setDynamicRareProps()
+	h.setDynamicOftenProps()
 
 }
 
@@ -78,20 +79,28 @@ func (h *Host) setStaticProps() {
 	h.setPropsViaSSH("uname -a", "uname -a")
 	h.setPropsViaSSH("hostname", "hostname")
 	h.setPropsViaSSH("dpkg --list ros*", "dpkg --list ros*")
-}
-
-func (h *Host) setDynamicProps() {
-	h.setPropsViaSSH("ifconfig", "ifconfig")
-	h.setPropsViaSSH("ps aux", "ps aux")
-	h.setPropsViaSSH("cat .rosmanage.role", "rosmanage.role")
 	h.setPropsViaSSH("cat /proc/meminfo", "meminfo")
 	h.setPropsViaSSH("cat /proc/cpuinfo", "cpuinfo")
+}
+
+func (h *Host) setDynamicRareProps() {
+	h.setPropsViaSSH("ifconfig", "ifconfig")
+	h.setPropsViaSSH("cat .rosmanage.role", "rosmanage.role")
 	h.setPropsViaSSH("which iperf", "which iperf")
 	h.setPropsViaSSH("which nmap", "which nmap")
+	h.setPropsViaSSH("rosmsg list", "rosmsg list")
+	h.setPropsViaSSH("rospack list", "rospack list")
+}
+
+func (h *Host) setDynamicOftenProps() {
+	h.setPropsViaSSH("ps aux", "ps aux")
+	h.setPropsViaSSH("uptime", "uptime")
+	h.setPropsViaSSH("rosnode list", "rosnode list")
+	h.setPropsViaSSH("rostopic list", "rostopic list")
 }
 
 func (h *Host) setPropsViaSSH(command string, key string) {
-	retval, err := sshCommand(h, h.client.client, command)
+	retval, err := sshCommand(h, h.Client.client, command)
 	if err == nil {
 		h.Props[key] = retval
 	}

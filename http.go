@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"log"
 	"net/http"
 	"text/template"
@@ -10,34 +9,82 @@ import (
 )
 
 type dashDataStruct struct {
-	HostCount int
-	Networks  map[string]Network
-	Hosts     map[string]*Host
+	Handler     string
+	Selected    string
+	SelectedObj interface{}
+	Params      httprouter.Params
+	Networks    map[string]Network
+	Hosts       map[string]*Host
+	Checks      map[string]*Check
 }
 
 var htmlTemplates *template.Template
 var dashTemplate *template.Template
 
-func webindex(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
+func getDashboard(handlername string, p httprouter.Params) dashDataStruct {
 	var dashData dashDataStruct
-	log.Println("http", "webindex", r.RemoteAddr)
+
+	dashTemplate, _ = template.New("dashboardlabel").ParseFiles("templates/dashboard.gotmpl")
 
 	dashData.Networks = KnownNetworks
+	dashData.Checks = KnownChecks
 	dashData.Hosts = make(map[string]*Host)
 	for _, halo := range KnownNetworks {
-		for name, host := range halo.hostok {
+		for name, host := range halo.Hostok {
 			dashData.Hosts[name] = host
 		}
 	}
-	dashData.HostCount = len(dashData.Hosts)
+	dashData.Handler = handlername
+	dashData.Params = p
+	return dashData
+}
 
-	// dashTemplate.Execute(w, dashData)
+func webindex(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
+	dashData := getDashboard("webindex", p)
+	log.Println("http", "webindex", r.RemoteAddr)
 	dashTemplate.ExecuteTemplate(w, "dashboard", dashData)
 }
 
-func webhello(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
-	fmt.Fprintf(w, "hello, %s!\n", ps.ByName("name"))
+func webnet(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
+	dashData := getDashboard("webnet", p)
+	dashData.Selected = p.ByName("iface")
+	var ok bool
+	log.Println("http", "webnet", r.RemoteAddr, p)
+
+	dashData.SelectedObj, ok = KnownNetworks[dashData.Selected]
+	if !ok {
+		panic("Not found " + dashData.Selected)
+	}
+	err := dashTemplate.ExecuteTemplate(w, "webnet", dashData)
+	if err != nil {
+		panic(err)
+	}
 }
+
+func webhost(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
+	dashData := getDashboard("webhost", p)
+	log.Println("http", "webhost", r.RemoteAddr, KnownHosts)
+	dashData.Selected = p.ByName("addr")
+	var ok bool
+	dashData.SelectedObj, ok = KnownHosts[dashData.Selected]
+	if !ok {
+		panic("Not found " + dashData.Selected)
+	}
+	err := dashTemplate.ExecuteTemplate(w, "webhost", dashData)
+	if err != nil {
+		panic(err)
+	}
+}
+
+/*func webhello(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	fmt.Fprintf(w, "hello, %s!\n", ps.ByName("name"))
+}*/
+
+/*var FuncMap = template.FuncMap{
+	"eq": func(a, b interface{}) bool {
+		return a == b
+	},
+}*/
 
 func httpmain() {
 	var err error
@@ -47,7 +94,8 @@ func httpmain() {
 	}
 	router := httprouter.New()
 	router.GET("/", webindex)
-	router.GET("/hello/:name", webhello)
+	router.GET("/net/:iface", webnet)
+	router.GET("/host/:addr", webhost)
 	router.ServeFiles("/static/*filepath", http.Dir("static/"))
 
 	log.Fatal(http.ListenAndServe(":8080", router))

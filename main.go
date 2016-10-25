@@ -19,6 +19,7 @@ const cfgSSHRetry = time.Second * 300
 // var Render = render.New(render.Options{IsDevelopment: true})
 
 func main() {
+	go checkmain()
 	go networkmain()
 	httpmain()
 }

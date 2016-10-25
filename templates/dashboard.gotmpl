@@ -8,6 +8,26 @@
 {{template "footer" . }}
 {{end}}
 
+{{define "webnet" }}
+{{template "header" .}}
+{{template "navbar" .}}
+{{template "structure header" .}}
+{{template "leftsidebar" .}}
+{{template "maincontent.webnet" .}}
+{{template "structure footer" .}}
+{{template "footer" . }}
+{{end}}
+
+{{define "webhost" }}
+{{template "header" .}}
+{{template "navbar" .}}
+{{template "structure header" .}}
+{{template "leftsidebar" .}}
+{{template "maincontent.webhost" .}}
+{{template "structure footer" .}}
+{{template "footer" . }}
+{{end}}
+
 
 {{define "header"}}
 <!DOCTYPE html>
@@ -19,18 +39,18 @@
     <!-- The above 3 meta tags *must* come first in the head; any other head content must come *after* these tags -->
     <meta name="description" content="Ros Manage Webapp">
     <meta name="author" content="Peter Kopias">
-    <link rel="icon" href="static/favicon.ico">
+    <link rel="icon" href="/static/favicon.ico">
 
-    <title>RosManage {{len .Hosts}}</title>
+    <title>RosManage</title>
 
     <!-- Bootstrap core CSS -->
-    <link href="static/css/bootstrap.min.css" rel="stylesheet">
+    <link href="/static/css/bootstrap.min.css" rel="stylesheet">
 
     <!-- IE10 viewport hack for Surface/desktop Windows 8 bug -->
-    <link href="static/css/ie10-viewport-bug-workaround.css" rel="stylesheet">
+    <link href="/static/css/ie10-viewport-bug-workaround.css" rel="stylesheet">
 
     <!-- Custom styles for this template -->
-    <link href="static/css/dashboard.css" rel="stylesheet">
+    <link href="/static/css/dashboard.css" rel="stylesheet">
 
     <!-- HTML5 shim and Respond.js for IE8 support of HTML5 elements and media queries -->
     <!--[if lt IE 9]>
@@ -53,6 +73,66 @@
           </button>
           <a class="navbar-brand" href="https://github.com/petrox/rosmanage">ROS Manage</a>
         </div>
+          <div id="navbar" class="navbar-collapse collapse">
+            <ul class="nav navbar-nav">
+              <li {{ if eq .Handler "webindex" }}class="active"{{end}}><a href="/">Home</a></li>
+              <li {{ if eq .Handler "webabout" }}class="active"{{end}}><a href="#">About</a></li>
+              <li class="dropdown">
+                <a href="#" class="dropdown-toggle {{ if eq .Handler "webnet" }} active{{end}}" data-toggle="dropdown" role="button" aria-haspopup="true" aria-expanded="false">Networks <span class="badge">{{ len .Networks}}</span><span class="caret"></span></a>
+                <ul class="dropdown-menu">
+{{ range .Networks}}
+            <li><a href="/net/{{.Iface}}">{{.NetAddr}} <span class="label label-info">{{.Iface}}</span></a></li>
+{{ end}}            
+                </ul>
+              </li>
+              <li class="dropdown">
+                <a href="#" class="dropdown-toggle {{ if eq .Handler "webhost" }} active{{end}}" data-toggle="dropdown" role="button" aria-haspopup="true" aria-expanded="false">Hosts <span class="badge">{{ len .Hosts}}</span><span class="caret"></span></a>
+                <ul class="dropdown-menu">
+{{ range .Hosts}}
+            <li><a href="/host/{{.Addr}}">{{.Addr}} <span class="label label-info">{{ index .Props "hostname"}}</span> {{ with .Client.Active}}<span class="label label-success">ssh</span>{{end}}</a></li>
+{{ end}}            
+                </ul>
+              </li>
+              <li class="dropdown">
+                <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-haspopup="true" aria-expanded="false">Nodes <span class="caret"></span></a>
+                <ul class="dropdown-menu">
+                  <li><a href="#">Action</a></li>
+                  <li><a href="#">Another action</a></li>
+                  <li><a href="#">Something else here</a></li>
+                  <li role="separator" class="divider"></li>
+                  <li class="dropdown-header">Nav header</li>
+                  <li><a href="#">Separated link</a></li>
+                  <li><a href="#">One more separated link</a></li>
+                </ul>
+              </li>
+              <li class="dropdown">
+                <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-haspopup="true" aria-expanded="false">Topics <span class="caret"></span></a>
+                <ul class="dropdown-menu">
+                  <li><a href="#">Action</a></li>
+                  <li><a href="#">Another action</a></li>
+                  <li><a href="#">Something else here</a></li>
+                  <li role="separator" class="divider"></li>
+                  <li class="dropdown-header">Nav header</li>
+                  <li><a href="#">Separated link</a></li>
+                  <li><a href="#">One more separated link</a></li>
+                </ul>
+              </li>
+              <li class="dropdown">
+                <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-haspopup="true" aria-expanded="false">Actions <span class="caret"></span></a>
+                <ul class="dropdown-menu">
+                  <li><a href="#">Speedtest TODO</a></li>
+                  <li><a href="#">Roslaunchlist TODO</a></li>
+                  <li><a href="#">ros dpkg compare TODO</a></li>
+                  <li><a href="#">rospack compare TODO</a></li>
+                  <li><a href="#">rosmsg compare TODO</a></li>
+                  <li><a href="#">git branch compare TODO</a></li>
+                  <li><a href="#">git version compare TODO</a></li>
+                </ul>
+              </li>
+
+            </ul>
+      </div>
+
 {{/*         <div id="navbar" class="navbar-collapse collapse">
           <ul class="nav navbar-nav navbar-right">
             <li><a href="#">Dashboard</a></li>
@@ -75,9 +155,9 @@
 {{define "leftsidebar"}}
         <div class="col-sm-3 col-md-2 sidebar">
           <ul class="nav nav-sidebar">
-            <li class="active">Hosts accessible <span class="sr-only">({{len .Hosts}})</span></a></li>
-{{ range .Hosts}}
-            <li><a href="#">{{.Addr}} </a></li>
+            <li class="active">State <span class="badge">{{len .Checks}}</span></a></li>
+{{ range .Checks}}
+            <li><a href="/check/{{.Name}}"><span class="label label-{{ with .IsOk }}success{{else}}danger{{end}}">{{.Name}}</a></a></li>
 {{ end}}            
           </ul>
 {{/*
@@ -97,6 +177,135 @@
         </div>
 {{end}}
 {{define "maincontent"}}
+        <div class="col-sm-9 col-sm-offset-3 col-md-10 col-md-offset-2 main">
+          <h1 class="page-header">Dashboard</h1>
+        </div>
+{{ end }}
+
+{{define "maincontent.webnet"}}
+        <div class="col-sm-9 col-sm-offset-3 col-md-10 col-md-offset-2 main">
+          <h1 class="page-header">{{.Selected}}</h1>
+
+
+          <div class="row placeholders">
+            <div class="col-xs-6 col-sm-3 placeholder">
+              <h4>Interface</h4>
+              <span class="text-muted">{{ (index .Networks .Selected).Iface}}</span>
+            </div>
+            <div class="col-xs-6 col-sm-3 placeholder">
+              <h4>Network / cidrmask</h4>
+              <span class="text-muted">{{ (index .Networks .Selected).NetAddr}}</span>
+            </div>
+            <div class="col-xs-6 col-sm-3 placeholder">
+              <h4>First seen</h4>
+              <span class="text-muted">{{ (index .Networks .Selected).FirstSeen}}</span>
+            </div>
+            <div class="col-xs-6 col-sm-3 placeholder">
+              <h4>Last scanned</h4>
+              <span class="text-muted">{{ (index .Networks .Selected).LastScanned}}</span>
+            </div>
+          </div>
+          {{ with len (index .Networks .Selected).Hostok }}
+          <h2 class="sub-header">Hosts on this network</h2>
+          {{end}}
+          <div class="table-responsive">
+            <table class="table table-striped">
+              <thead>
+                <tr>
+                  <th>Hostname</th>
+                  <th>Addr</th>
+                  <th>RosRole</th>
+                  <th>uptime</th>
+                </tr>
+              </thead>
+              <tbody>
+          {{ range (index .Networks .Selected).Hostok }}
+                <tr>
+                  <td>{{index .Props "hostname"}}</td>
+                  <td><a href="/host/{{.Addr}}">{{.Addr}}</a></td>
+                  <td>{{index .Props "rosmanage.role"}}</td>
+                  <td>{{index .Props "uptime"}}</td>
+                </tr>
+          {{ end}}
+              </tbody>
+            </table>
+          </div>
+          {{/*end*/}}
+        </div>
+{{ end }}
+
+{{define "maincontent.webhost"}}
+        <div class="col-sm-9 col-sm-offset-3 col-md-10 col-md-offset-2 main">
+          <h1 class="page-header">{{.Selected}}</h1>
+
+
+          <div class="row placeholders">
+            <div class="col-xs-6 col-sm-3 placeholder">
+              <h4>Hostname</h4>
+              <span class="text-muted">{{ index ((index .Hosts .Selected).Props) "hostname"}}</span>
+            </div>
+            <div class="col-xs-6 col-sm-3 placeholder">
+              <h4>Address</h4>
+              <span class="text-muted">{{ (index .Hosts .Selected).Addr}}</span>
+            </div>
+            <div class="col-xs-6 col-sm-3 placeholder">
+              <h4>First seen</h4>
+              <span class="text-muted">{{ (index .Hosts .Selected).FirstSeen}}</span>
+            </div>
+            <div class="col-xs-6 col-sm-3 placeholder">
+              <h4>Last scanned</h4>
+              <span class="text-muted">{{ (index .Hosts .Selected).LastScanned}}</span>
+
+            </div>
+          </div>
+          {{ with len (index .Hosts .Selected).Props }}
+          <h2 class="sub-header">Properties</h2>
+          {{end}}
+          {{ range $key,$val := (index .Hosts .Selected).Props }}
+                <ul>
+                  <li><a href="#{{ $key }}">{{ $key }}</a></li>
+                </ul>
+          {{ end}}
+
+          <div class="table-responsive">
+            <table class="table table-striped">
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Value</th>
+                </tr>
+              </thead>
+              <tbody>
+          {{ range $key,$val := (index .Hosts .Selected).Props }}
+                <tr>
+                  <td><a name="{{ $key }}">{{ $key }}</a></td>
+                  <td><pre>{{ $val}}</pre></td>
+                </tr>
+          {{ end}}
+              </tbody>
+            </table>
+          </div>
+          {{/*end*/}}
+        </div>
+{{ end }}
+
+{{ define "structure footer" }}
+      </div>
+    </div>
+{{ end }}
+{{ define "footer" }}
+    <!-- Bootstrap core JavaScript
+    ================================================== -->
+    <!-- Placed at the end of the document so the pages load faster -->
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.4/jquery.min.js"></script>
+    <script>window.jQuery || document.write('<script src="/static/js/jquery.min.js"><\/script>')</script>
+    <script src="/static/js/bootstrap.min.js"></script>
+
+  </body>
+</html>
+{{ end }}
+
+{{define "maincontent.orig"}}
         <div class="col-sm-9 col-sm-offset-3 col-md-10 col-md-offset-2 main">
           <h1 class="page-header">Dashboard</h1>
 
@@ -252,23 +461,4 @@
             </table>
           </div>
         </div>
-{{ end }}
-{{ define "structure footer" }}
-      </div>
-    </div>
-{{ end }}
-{{ define "footer" }}
-    <!-- Bootstrap core JavaScript
-    ================================================== -->
-    <!-- Placed at the end of the document so the pages load faster -->
-    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.4/jquery.min.js"></script>
-    <script>window.jQuery || document.write('<script src="static/js/jquery.min.js"><\/script>')</script>
-    <script src="static/js/bootstrap.min.js"></script>
-    <!-- Just to make our placeholder images work. Don't actually copy the next line! -->
-    <script src="static/js/vendor/holder.min.js"></script>
-    <!-- IE10 viewport hack for Surface/desktop Windows 8 bug -->
-    <script src="static/js/ie10-viewport-bug-workaround.js"></script>
-
-  </body>
-</html>
 {{ end }}

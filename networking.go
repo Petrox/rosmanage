@@ -13,35 +13,34 @@ import (
 
 // Network contains details about a network accessible to the app
 type Network struct {
+	Iface       string
 	NetAddr     string
 	FirstSeen   time.Time
 	LastScanned time.Time
-	hostok      map[string]*Host
+	Hostok      map[string]*Host
 	Props       properties
 }
 
 // Host contains details of a known remote host
 type Host struct {
 	Addr        string
-	RosRoles    string
-	RosID       string
 	IsLocalhost bool
 	IsPreferred bool
 	OpenPorts   map[int16]struct{}
 	FirstSeen   time.Time
 	LastScanned time.Time
-	client      sshClient
+	Client      sshClient
 	Props       properties
 }
 
 type properties map[string]string
 
 type sshClient struct {
-	active    bool
+	Active    bool
 	client    *ssh.Client
-	firsttry  time.Time
-	lasttry   time.Time
-	props     properties
+	FirstTry  time.Time
+	LastTry   time.Time
+	Props     properties
 	chQuit    chan bool
 	chCommand chan string
 }
@@ -72,7 +71,7 @@ func getNetworks() map[string]Network {
 		addrs, _ := iface.Addrs()
 		if len(addrs) > 0 && (iface.Flags&net.FlagUp) > 0 {
 			// fmt.Printf("%s : %s\n", iface.Name, addrs[0])
-			thisnet := Network{NetAddr: addrs[0].String(), hostok: make(map[string]*Host), Props: make(properties)}
+			thisnet := Network{Iface: iface.Name, NetAddr: addrs[0].String(), Hostok: make(map[string]*Host), Props: make(properties)}
 			nets[iface.Name] = thisnet
 		}
 	}
@@ -117,22 +116,25 @@ func scanNetworks() {
 func updateHosts(halo Network) {
 	hostok := scanHosts(halo)
 	for addr, host := range hostok {
-		if val, ok := halo.hostok[addr]; ok == false {
+		if val, ok := halo.Hostok[addr]; ok == false {
 			log.Println("Host found:", addr)
 			host.FirstSeen = time.Now()
-			halo.hostok[addr] = host
+			halo.Hostok[addr] = host
+			KnownHosts[addr] = *host
 			host.startSSHClient()
 		} else {
 			val.OpenPorts = host.OpenPorts
 			val.IsLocalhost = host.IsLocalhost
 			val.IsPreferred = host.IsPreferred
-			halo.hostok[addr] = val
+			halo.Hostok[addr] = val
+			KnownHosts[addr] = *val
 		}
 	}
-	for addr := range halo.hostok {
+	for addr := range halo.Hostok {
 		if _, ok := hostok[addr]; ok == false {
 			log.Println("Host down:", addr)
-			delete(halo.hostok, addr)
+			delete(halo.Hostok, addr)
+			delete(KnownHosts, addr)
 		}
 	}
 }
@@ -180,7 +182,7 @@ func scanHosts(halo Network) map[string]*Host {
 			host.IsPreferred = host.IsLocalhost && networkparts[0] != "127.0.0.1"
 			host.Addr = lineparts[1]
 			host.Props = make(properties)
-			host.client.props = make(properties)
+			host.Client.Props = make(properties)
 			host.OpenPorts = make(map[int16]struct{})
 			var portcolumn = false
 			for _, column := range lineparts {
@@ -207,7 +209,7 @@ func scanHosts(halo Network) map[string]*Host {
 
 func (h *Host) startSSHClient() bool {
 	_, ok := h.OpenPorts[22]
-	if !ok || h.client.active {
+	if !ok || h.Client.Active {
 		return false
 	}
 
@@ -218,9 +220,9 @@ func (h *Host) startSSHClient() bool {
 
 func (h *Host) stoppedSSHClient() bool {
 	log.Println("SSH client stopped", h.Addr)
-	if !h.client.active {
+	if !h.Client.Active {
 		return false
 	}
-	h.client.active = false
+	h.Client.Active = false
 	return true
 }
