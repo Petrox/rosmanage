@@ -7,8 +7,6 @@ import (
 	"strconv"
 	"strings"
 	"time"
-
-	"golang.org/x/crypto/ssh"
 )
 
 // Network contains details about a network accessible to the app
@@ -23,27 +21,21 @@ type Network struct {
 
 // Host contains details of a known remote host
 type Host struct {
-	Addr        string
-	IsLocalhost bool
-	IsPreferred bool
-	OpenPorts   map[int16]struct{}
-	FirstSeen   time.Time
-	LastScanned time.Time
-	Client      sshClient
-	Props       properties
+	Addr                   string
+	IsLocalhost            bool
+	IsPreferred            bool
+	OpenPorts              map[int16]struct{}
+	FirstSeen              time.Time
+	LastScanned            time.Time
+	LastStaticUpdate       time.Time
+	LastDynamicRareUpdate  time.Time
+	LastDynamicOftenUpdate time.Time
+	ControlClient          HostControlClient
+	Props                  properties
+	TerminalHistory        []TerminalEvent
 }
 
 type properties map[string]string
-
-type sshClient struct {
-	Active    bool
-	client    *ssh.Client
-	FirstTry  time.Time
-	LastTry   time.Time
-	Props     properties
-	chQuit    chan bool
-	chCommand chan string
-}
 
 // KnownNetworks contains all the Networks we can access
 var KnownNetworks = make(map[string]Network)
@@ -182,7 +174,11 @@ func scanHosts(halo Network) map[string]*Host {
 			host.IsPreferred = host.IsLocalhost && networkparts[0] != "127.0.0.1"
 			host.Addr = lineparts[1]
 			host.Props = make(properties)
-			host.Client.Props = make(properties)
+			host.ControlClient.chCommand = make(chan string, 10)
+			host.ControlClient.chQuit = make(chan bool, 10)
+			host.ControlClient.chTerminal = make(chan TerminalEvent, 10)
+			host.ControlClient.Props = make(properties)
+			host.TerminalHistory = make([]TerminalEvent, 0, 10)
 			host.OpenPorts = make(map[int16]struct{})
 			var portcolumn = false
 			for _, column := range lineparts {
@@ -209,20 +205,20 @@ func scanHosts(halo Network) map[string]*Host {
 
 func (h *Host) startSSHClient() bool {
 	_, ok := h.OpenPorts[22]
-	if !ok || h.Client.Active {
+	if !ok || h.ControlClient.Active {
 		return false
 	}
 
 	log.Println("SSH client started", h.Addr)
-	go sshClientWorker(h)
+	go h.sshClientWorker()
 	return true
 }
 
 func (h *Host) stoppedSSHClient() bool {
 	log.Println("SSH client stopped", h.Addr)
-	if !h.Client.Active {
+	if !h.ControlClient.Active {
 		return false
 	}
-	h.Client.Active = false
+	h.ControlClient.Active = false
 	return true
 }

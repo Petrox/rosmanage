@@ -5,6 +5,7 @@ import (
 	"io/ioutil"
 	"log"
 	"os/user"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -22,23 +23,40 @@ import (
 	"time"
 */
 
-func sshClientWorker(h *Host) {
-	if time.Since(h.Client.FirstTry) > time.Hour*365*24 {
-		h.Client.FirstTry = time.Now()
+// HostControlClient contains the details how can we control the given host
+type HostControlClient struct {
+	Active          bool
+	CurrentJob      string
+	CurrentJobSince time.Time
+	client          *ssh.Client
+	FirstTry        time.Time
+	LastTry         time.Time
+	Props           properties
+	chQuit          chan bool
+	chCommand       chan string
+	chTerminal      chan TerminalEvent
+}
+
+func (h *Host) sshClientWorker() {
+	if time.Since(h.ControlClient.FirstTry) > time.Hour*365*24 {
+		h.ControlClient.FirstTry = time.Now()
 	} else {
-		if time.Since(h.Client.LastTry) < cfgSSHRetry {
+		if time.Since(h.ControlClient.LastTry) < cfgSSHRetry {
 			return
 		}
 	}
-	h.Client.Active = true
+	log.Println(h.Addr, "active", h.ControlClient.Active)
+	h.ControlClient.Active = true
+	log.Println(h.Addr, "active", h.ControlClient.Active)
 	defer h.stoppedSSHClient()
-	h.Client.LastTry = time.Now()
+	h.ControlClient.LastTry = time.Now()
 	//	proc := exec.Command("ssh", "-o TCPKeepAlive", h.addr)
 	key, err := getKeyFile()
 	if err != nil {
 		log.Println("SSH key error", h.Addr, err.Error())
 		return
 	}
+	log.Println(h.Addr, "active", h.ControlClient.Active)
 	usr, _ := user.Current()
 	config := &ssh.ClientConfig{
 		User: usr.Username,
@@ -52,29 +70,89 @@ func sshClientWorker(h *Host) {
 		return
 	}
 	//var retval string
-	h.Client.client = client
-	rosmanageuuidstr, err := sshCommand(h, client, "cat .rosmanage.uuid")
+	h.ControlClient.client = client
+	rosmanageuuidstr, err := h.sshCommand("cat .rosmanage.uuid")
+	log.Println(h.Addr, "active", h.ControlClient.Active)
 	if err == nil {
 		h.Props["rosmanage.uuid"] = rosmanageuuidstr
 	} else {
 		rosmanageuuid := uuid.New()
 		log.Println("UUID", rosmanageuuid.String())
-		sshCommand(h, client, "echo '"+rosmanageuuid.String()+"' > .rosmanage.uuid")
-		rosmanageuuidstr, err = sshCommand(h, client, "cat .rosmanage.uuid")
+		h.sshCommand("echo '" + rosmanageuuid.String() + "' > .rosmanage.uuid")
+		rosmanageuuidstr, err = h.sshCommand("cat .rosmanage.uuid")
 		if err == nil {
 			h.Props["rosmanage.uuid"] = rosmanageuuidstr
 		}
 	}
+	log.Println(h.Addr, "active", h.ControlClient.Active)
 
 	h.setStaticProps()
 	h.setDynamicRareProps()
 	h.setDynamicOftenProps()
+	log.Println(h.Addr, "active", h.ControlClient.Active)
+	var quit bool
+	for !quit {
+		select {
+		case quit = <-h.ControlClient.chQuit:
+			log.Println(h.Addr, "active", h.ControlClient.Active)
+			if quit {
+				log.Println("sshclient", h.Addr, "exiting")
+			}
+		case command := <-h.ControlClient.chCommand:
+			log.Println("sshcommand", command, h.runCommand(command))
+			log.Println(h.Addr, "active", h.ControlClient.Active)
+		case term := <-h.ControlClient.chTerminal:
+			log.Println("sshtermcommand", term.Command)
+			log.Println(h.Addr, "active", h.ControlClient.Active)
+			term.Begin = time.Now()
+			term.Stdout = h.runCommand(term.Command)
+			term.End = time.Now()
+			h.TerminalHistory = append(h.TerminalHistory, term)
+			log.Println("terminalhistory", h.Addr, h.TerminalHistory)
 
+		case <-time.After(time.Second * 1):
+			log.Println("timeout")
+			log.Println(h.Addr, "active", h.ControlClient.Active)
+			if time.Since(h.LastStaticUpdate) > cfgUpdateIntervalStatic {
+				h.setStaticProps()
+			}
+			if time.Since(h.LastDynamicRareUpdate) > cfgUpdateIntervalDynamicRare {
+				h.setDynamicRareProps()
+			}
+			if time.Since(h.LastDynamicOftenUpdate) > cfgUpdateIntervalDynamicOften {
+				h.setDynamicOftenProps()
+			}
+		}
+
+	}
+}
+
+func (h *Host) runTerminalCommand(command string) {
+	log.Println("runTerminalCommandx", command, h.ControlClient.Active)
+	log.Println(h.Addr, "active", h.ControlClient.Active)
+	if !h.ControlClient.Active {
+		return
+	}
+	log.Println("runTerminalCommandy", command)
+
+	t := TerminalEvent{Sent: time.Now(), Command: command}
+	log.Println("runTerminalCommand", command)
+	h.ControlClient.chTerminal <- t
+}
+
+func (h *Host) runCommand(command string) string {
+	retval, err := h.sshCommand(command)
+	if err == nil {
+		return retval
+	}
+	return ""
 }
 
 func (h *Host) setStaticProps() {
+	h.LastScanned = time.Now()
+	h.LastStaticUpdate = time.Now()
+	h.setPropsViaSSH("pwd", "pwd")
 	h.setPropsViaSSH("/usr/bin/whoami", "whoami")
-	h.setPropsViaSSH("lsusb", "lsusb")
 	h.setPropsViaSSH("lsb_release -a", "lsb_release -a")
 	h.setPropsViaSSH("uname -a", "uname -a")
 	h.setPropsViaSSH("hostname", "hostname")
@@ -84,7 +162,11 @@ func (h *Host) setStaticProps() {
 }
 
 func (h *Host) setDynamicRareProps() {
+	h.LastScanned = time.Now()
+	h.LastDynamicRareUpdate = time.Now()
 	h.setPropsViaSSH("ifconfig", "ifconfig")
+	h.setPropsViaSSH("lsusb", "lsusb")
+	h.setPropsViaSSH("lshw", "lshw")
 	h.setPropsViaSSH("cat .rosmanage.role", "rosmanage.role")
 	h.setPropsViaSSH("which iperf", "which iperf")
 	h.setPropsViaSSH("which nmap", "which nmap")
@@ -93,6 +175,8 @@ func (h *Host) setDynamicRareProps() {
 }
 
 func (h *Host) setDynamicOftenProps() {
+	h.LastScanned = time.Now()
+	h.LastDynamicOftenUpdate = time.Now()
 	h.setPropsViaSSH("ps aux", "ps aux")
 	h.setPropsViaSSH("uptime", "uptime")
 	h.setPropsViaSSH("rosnode list", "rosnode list")
@@ -100,14 +184,21 @@ func (h *Host) setDynamicOftenProps() {
 }
 
 func (h *Host) setPropsViaSSH(command string, key string) {
-	retval, err := sshCommand(h, h.Client.client, command)
+	retval, err := h.sshCommand(command)
 	if err == nil {
-		h.Props[key] = retval
+		h.Props[key] = strings.TrimSuffix(retval, "\n")
 	}
 }
 
-func sshCommand(h *Host, client *ssh.Client, command string) (string, error) {
-	controlsession, err := client.NewSession()
+func (h *HostControlClient) Working(command string) {
+	h.CurrentJob = command
+	h.CurrentJobSince = time.Now()
+}
+
+func (h *Host) sshCommand(command string) (string, error) {
+	h.ControlClient.Working(command)
+	defer h.ControlClient.Working("")
+	controlsession, err := h.ControlClient.client.NewSession()
 	if err != nil {
 		log.Println("SSH session error", h.Addr, err.Error())
 	}
@@ -118,7 +209,7 @@ func sshCommand(h *Host, client *ssh.Client, command string) (string, error) {
 		log.Println("SSH command error", h.Addr, command, err.Error())
 		return "", err
 	}
-	log.Println("SSH command result", h.Addr, command, b.String())
+	// log.Println("SSH command result", h.Addr, command, b.String())
 	return b.String(), nil
 }
 

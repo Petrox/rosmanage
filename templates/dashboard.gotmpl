@@ -89,7 +89,7 @@
                 <a href="#" class="dropdown-toggle {{ if eq .Handler "webhost" }} active{{end}}" data-toggle="dropdown" role="button" aria-haspopup="true" aria-expanded="false">Hosts <span class="badge">{{ len .Hosts}}</span><span class="caret"></span></a>
                 <ul class="dropdown-menu">
 {{ range .Hosts}}
-            <li><a href="/host/{{.Addr}}">{{.Addr}} <span class="label label-info">{{ index .Props "hostname"}}</span> {{ with .Client.Active}}<span class="label label-success">ssh</span>{{end}}</a></li>
+            <li><a href="/host/{{.Addr}}">{{.Addr}} <span class="label label-info">{{ index .Props "hostname"}}</span> {{ with .ControlClient.Active}}<span class="label label-success">ssh</span>{{end}}</a></li>
 {{ end}}            
                 </ul>
               </li>
@@ -255,17 +255,45 @@
             <div class="col-xs-6 col-sm-3 placeholder">
               <h4>Last scanned</h4>
               <span class="text-muted">{{ (index .Hosts .Selected).LastScanned}}</span>
-
+            </div>
+            <div class="col-xs-6 col-sm-3 placeholder">
+              <h4>Currently</h4>
+              <span class="text-muted">{{ with (index .Hosts .Selected).ControlClient.CurrentJob }}  <span class="alert alert-info">{{(index .Hosts .Selected).ControlClient.CurrentJob}}</span>{{else}} idle {{end}}</span>
             </div>
           </div>
+
+          <h2 class="sub-header">Terminal</h2>
+
+          <div class="row placeholders">
+            <div class="col-xs-6 col-sm-6 placeholder">
+{{ with (index .Hosts .Selected).TerminalHistory }}
+{{ range $k,$v:=(index $.Hosts $.Selected).TerminalHistory }}
+              <span class="text-muted"><span class="alert alert-info">{{ index (index $.Hosts $.Selected).Props "whoami"}}@{{ index (index $.Hosts $.Selected).Props "hostname"}}:{{ index (index $.Hosts $.Selected).Props "pwd"}}$ {{ $v.Command}}</span></span><br/>
+              <span class="text-muted">{{ $v.Stdout}}</span><br/>
+{{ end }}
+{{ else }}
+              <span class="text-muted">no history yet</span>
+{{ end }}
+<form method="post" action="/terminal/{{.Selected}}">
+<div class="input-group">
+  <span class="input-group-addon" id="basic-addon3">{{ index (index .Hosts .Selected).Props "whoami" -}}@{{ index (index .Hosts .Selected).Props "hostname"}}:{{  index (index .Hosts .Selected).Props "pwd"}}$</span>
+  <input type="text" name="command" class="form-control" id="basic-url" aria-describedby="basic-addon3">
+  <span class="input-group-btn">
+        <button class="btn btn-info" type="submit">[enter]</button>
+  </span>
+</div>
+</form>
+            </div>
+          </div>
+
           {{ with len (index .Hosts .Selected).Props }}
           <h2 class="sub-header">Properties</h2>
           {{end}}
-          {{ range $key,$val := (index .Hosts .Selected).Props }}
                 <ul>
+          {{ range $key,$val := (index .Hosts .Selected).Props }}
                   <li><a href="#{{ $key }}">{{ $key }}</a></li>
-                </ul>
           {{ end}}
+                </ul>
 
           <div class="table-responsive">
             <table class="table table-striped">

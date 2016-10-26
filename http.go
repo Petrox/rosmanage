@@ -63,7 +63,7 @@ func webnet(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 
 func webhost(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 	dashData := getDashboard("webhost", p)
-	log.Println("http", "webhost", r.RemoteAddr, KnownHosts)
+	log.Println("http", "webhost", r.RemoteAddr)
 	dashData.Selected = p.ByName("addr")
 	var ok bool
 	dashData.SelectedObj, ok = KnownHosts[dashData.Selected]
@@ -96,6 +96,7 @@ func httpmain() {
 	router.GET("/", webindex)
 	router.GET("/net/:iface", webnet)
 	router.GET("/host/:addr", webhost)
+	router.POST("/terminal/:addr", webterminal)
 	router.ServeFiles("/static/*filepath", http.Dir("static/"))
 
 	log.Fatal(http.ListenAndServe(":8080", router))
