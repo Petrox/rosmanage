@@ -26,7 +26,7 @@ func webterminal(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 	if !ok {
 		panic("Not found " + addr)
 	}
-	cmd := p.ByName("command")
+	cmd := r.FormValue("command")
 	h.runTerminalCommand(cmd)
 	http.Redirect(w, r, "/host/"+addr, 302)
 }

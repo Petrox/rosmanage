@@ -45,9 +45,7 @@ func (h *Host) sshClientWorker() {
 			return
 		}
 	}
-	log.Println(h.Addr, "active", h.ControlClient.Active)
 	h.ControlClient.Active = true
-	log.Println(h.Addr, "active", h.ControlClient.Active)
 	defer h.stoppedSSHClient()
 	h.ControlClient.LastTry = time.Now()
 	//	proc := exec.Command("ssh", "-o TCPKeepAlive", h.addr)
@@ -56,7 +54,6 @@ func (h *Host) sshClientWorker() {
 		log.Println("SSH key error", h.Addr, err.Error())
 		return
 	}
-	log.Println(h.Addr, "active", h.ControlClient.Active)
 	usr, _ := user.Current()
 	config := &ssh.ClientConfig{
 		User: usr.Username,
@@ -72,7 +69,6 @@ func (h *Host) sshClientWorker() {
 	//var retval string
 	h.ControlClient.client = client
 	rosmanageuuidstr, err := h.sshCommand("cat .rosmanage.uuid")
-	log.Println(h.Addr, "active", h.ControlClient.Active)
 	if err == nil {
 		h.Props["rosmanage.uuid"] = rosmanageuuidstr
 	} else {
@@ -84,26 +80,21 @@ func (h *Host) sshClientWorker() {
 			h.Props["rosmanage.uuid"] = rosmanageuuidstr
 		}
 	}
-	log.Println(h.Addr, "active", h.ControlClient.Active)
 
 	h.setStaticProps()
 	h.setDynamicRareProps()
 	h.setDynamicOftenProps()
-	log.Println(h.Addr, "active", h.ControlClient.Active)
 	var quit bool
 	for !quit {
 		select {
 		case quit = <-h.ControlClient.chQuit:
-			log.Println(h.Addr, "active", h.ControlClient.Active)
 			if quit {
 				log.Println("sshclient", h.Addr, "exiting")
 			}
 		case command := <-h.ControlClient.chCommand:
 			log.Println("sshcommand", command, h.runCommand(command))
-			log.Println(h.Addr, "active", h.ControlClient.Active)
 		case term := <-h.ControlClient.chTerminal:
 			log.Println("sshtermcommand", term.Command)
-			log.Println(h.Addr, "active", h.ControlClient.Active)
 			term.Begin = time.Now()
 			term.Stdout = h.runCommand(term.Command)
 			term.End = time.Now()
@@ -112,7 +103,6 @@ func (h *Host) sshClientWorker() {
 
 		case <-time.After(time.Second * 1):
 			log.Println("timeout")
-			log.Println(h.Addr, "active", h.ControlClient.Active)
 			if time.Since(h.LastStaticUpdate) > cfgUpdateIntervalStatic {
 				h.setStaticProps()
 			}
@@ -128,13 +118,9 @@ func (h *Host) sshClientWorker() {
 }
 
 func (h *Host) runTerminalCommand(command string) {
-	log.Println("runTerminalCommandx", command, h.ControlClient.Active)
-	log.Println(h.Addr, "active", h.ControlClient.Active)
 	if !h.ControlClient.Active {
 		return
 	}
-	log.Println("runTerminalCommandy", command)
-
 	t := TerminalEvent{Sent: time.Now(), Command: command}
 	log.Println("runTerminalCommand", command)
 	h.ControlClient.chTerminal <- t

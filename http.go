@@ -13,7 +13,7 @@ type dashDataStruct struct {
 	Selected    string
 	SelectedObj interface{}
 	Params      httprouter.Params
-	Networks    map[string]Network
+	Networks    map[string]*Network
 	Hosts       map[string]*Host
 	Checks      map[string]*Check
 }
@@ -67,6 +67,7 @@ func webhost(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 	dashData.Selected = p.ByName("addr")
 	var ok bool
 	dashData.SelectedObj, ok = KnownHosts[dashData.Selected]
+	log.Println(KnownHosts[dashData.Selected].TerminalHistory)
 	if !ok {
 		panic("Not found " + dashData.Selected)
 	}

@@ -258,18 +258,23 @@
             </div>
             <div class="col-xs-6 col-sm-3 placeholder">
               <h4>Currently</h4>
-              <span class="text-muted">{{ with (index .Hosts .Selected).ControlClient.CurrentJob }}  <span class="alert alert-info">{{(index .Hosts .Selected).ControlClient.CurrentJob}}</span>{{else}} idle {{end}}</span>
+              <span class="text-muted">{{ with (index .Hosts .Selected).ControlClient.CurrentJob }} <h4>{{.}}</h4>{{else}} idle {{end}}</span>
             </div>
           </div>
 
           <h2 class="sub-header">Terminal</h2>
 
           <div class="row placeholders">
-            <div class="col-xs-6 col-sm-6 placeholder">
+            <div align=left class="col-xs-6 col-sm-6 placeholder">
 {{ with (index .Hosts .Selected).TerminalHistory }}
 {{ range $k,$v:=(index $.Hosts $.Selected).TerminalHistory }}
-              <span class="text-muted"><span class="alert alert-info">{{ index (index $.Hosts $.Selected).Props "whoami"}}@{{ index (index $.Hosts $.Selected).Props "hostname"}}:{{ index (index $.Hosts $.Selected).Props "pwd"}}$ {{ $v.Command}}</span></span><br/>
-              <span class="text-muted">{{ $v.Stdout}}</span><br/>
+<div class="bs-callout bs-callout-info" id="callout-navbar-breakpoint"> 
+<h4>{{ index (index $.Hosts $.Selected).Props "whoami"}}@{{ index (index $.Hosts $.Selected).Props "hostname"}}:{{ index (index $.Hosts $.Selected).Props "pwd"}}$ {{ $v.Command}}</h4> 
+<p><pre><span class="label label-info">{{$v.Begin}}</span>
+{{ $v.Stdout}}
+<span class="label label-info">{{$v.End}}</span>
+</pre></p> 
+</div>
 {{ end }}
 {{ else }}
               <span class="text-muted">no history yet</span>

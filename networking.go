@@ -38,10 +38,10 @@ type Host struct {
 type properties map[string]string
 
 // KnownNetworks contains all the Networks we can access
-var KnownNetworks = make(map[string]Network)
+var KnownNetworks = make(map[string]*Network)
 
 // KnownHosts containt all the Hosts we can access
-var KnownHosts = make(map[string]Host)
+var KnownHosts = make(map[string]*Host)
 
 func networkmain() {
 	updateNetworks()
@@ -77,13 +77,13 @@ func updateNetworks() {
 			log.Println("Network found:", name, net.NetAddr)
 			net.FirstSeen = time.Now()
 			net.LastScanned = time.Unix(0, 0)
-			KnownNetworks[name] = net
+			KnownNetworks[name] = &net
 		} else {
 			if val.NetAddr != net.NetAddr {
 				log.Println("Network changed:", name, val.NetAddr, net.NetAddr)
 				net.FirstSeen = time.Now()
 				net.LastScanned = time.Unix(0, 0)
-				KnownNetworks[name] = net
+				KnownNetworks[name] = &net
 			}
 		}
 	}
@@ -105,21 +105,21 @@ func scanNetworks() {
 	}
 }
 
-func updateHosts(halo Network) {
+func updateHosts(halo *Network) {
 	hostok := scanHosts(halo)
 	for addr, host := range hostok {
 		if val, ok := halo.Hostok[addr]; ok == false {
 			log.Println("Host found:", addr)
 			host.FirstSeen = time.Now()
 			halo.Hostok[addr] = host
-			KnownHosts[addr] = *host
+			KnownHosts[addr] = host
 			host.startSSHClient()
 		} else {
 			val.OpenPorts = host.OpenPorts
 			val.IsLocalhost = host.IsLocalhost
 			val.IsPreferred = host.IsPreferred
 			halo.Hostok[addr] = val
-			KnownHosts[addr] = *val
+			KnownHosts[addr] = val
 		}
 	}
 	for addr := range halo.Hostok {
@@ -130,7 +130,7 @@ func updateHosts(halo Network) {
 		}
 	}
 }
-func scanHosts(halo Network) map[string]*Host {
+func scanHosts(halo *Network) map[string]*Host {
 	beginning := time.Now()
 	var hostok = make(map[string]*Host)
 	halo.LastScanned = time.Now()
