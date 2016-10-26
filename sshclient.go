@@ -102,7 +102,6 @@ func (h *Host) sshClientWorker() {
 			log.Println("terminalhistory", h.Addr, h.TerminalHistory)
 
 		case <-time.After(time.Second * 1):
-			log.Println("timeout")
 			if time.Since(h.LastStaticUpdate) > cfgUpdateIntervalStatic {
 				h.setStaticProps()
 			}

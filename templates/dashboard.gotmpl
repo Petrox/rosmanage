@@ -257,6 +257,10 @@
               <span class="text-muted">{{ (index .Hosts .Selected).LastScanned}}</span>
             </div>
             <div class="col-xs-6 col-sm-3 placeholder">
+              <h4>SSH client</h4>
+              <span class="text-muted">{{ with (index .Hosts .Selected).ControlClient.Active }} <span class="label label-success">Connected</a>{{else}} <span class="label label-warning">Disconnected</a> {{end}}</span>
+            </div>
+            <div class="col-xs-6 col-sm-3 placeholder">
               <h4>Currently</h4>
               <span class="text-muted">{{ with (index .Hosts .Selected).ControlClient.CurrentJob }} <h4>{{.}}</h4>{{else}} idle {{end}}</span>
             </div>
@@ -279,15 +283,17 @@
 {{ else }}
               <span class="text-muted">no history yet</span>
 {{ end }}
-<form method="post" action="/terminal/{{.Selected}}">
+{{ with (index .Hosts .Selected).ControlClient.Active }}
+<form method="post" action="/terminal/{{$.Selected}}">
 <div class="input-group">
-  <span class="input-group-addon" id="basic-addon3">{{ index (index .Hosts .Selected).Props "whoami" -}}@{{ index (index .Hosts .Selected).Props "hostname"}}:{{  index (index .Hosts .Selected).Props "pwd"}}$</span>
+  <span class="input-group-addon" id="basic-addon3">{{ index (index $.Hosts $.Selected).Props "whoami" -}}@{{ index (index $.Hosts $.Selected).Props "hostname"}}:{{  index (index $.Hosts $.Selected).Props "pwd"}}$</span>
   <input type="text" name="command" class="form-control" id="basic-url" aria-describedby="basic-addon3">
   <span class="input-group-btn">
         <button class="btn btn-info" type="submit">[enter]</button>
   </span>
 </div>
 </form>
+{{end}}
             </div>
           </div>
 
