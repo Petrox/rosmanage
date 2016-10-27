@@ -80,11 +80,11 @@ func (h *Host) sshClientWorker() {
 			h.Props["rosmanage.uuid"] = rosmanageuuidstr
 		}
 	}
-
+	var quit bool
+	quit = checkUUIDforDuplicates(h)
 	h.setStaticProps()
 	h.setDynamicRareProps()
 	h.setDynamicOftenProps()
-	var quit bool
 	for !quit {
 		select {
 		case quit = <-h.ControlClient.chQuit:
@@ -114,6 +114,24 @@ func (h *Host) sshClientWorker() {
 		}
 
 	}
+}
+
+// checkUUIDforDuplicates returns true if we should quit, false if we can move on
+func checkUUIDforDuplicates(h *Host) bool {
+	for _, host := range KnownHosts {
+		if (host.Props["uuid"] == h.Props["uuid"]) && (host.Addr != h.Addr || host.NetAddr != h.NetAddr || host.Iface != h.Iface) {
+			if host.ControlClient.Active {
+				log.Println("compare: ", h.Iface, h.NetAddr, h.Addr, " --- ", host.Iface, h.NetAddr, h.Addr)
+				if h.betterThan(host) > 0 {
+					host.disconnect()
+				} else {
+					log.Println("ssh disconnect ", h.Iface, h.NetAddr, h.Addr, " because we're worse than ", host.Iface, host.NetAddr, host.Addr)
+					return true
+				}
+			}
+		}
+	}
+	return false
 }
 
 func (h *Host) runTerminalCommand(command string) {
@@ -150,13 +168,22 @@ func (h *Host) setDynamicRareProps() {
 	h.LastScanned = time.Now()
 	h.LastDynamicRareUpdate = time.Now()
 	h.setPropsViaSSH("ifconfig", "ifconfig")
-	h.setPropsViaSSH("lsusb", "lsusb")
-	h.setPropsViaSSH("lshw", "lshw")
-	h.setPropsViaSSH("cat .rosmanage.role", "rosmanage.role")
+	h.setPropsViaSSH("if [ -r .rosmanage.role ]; then cat .rosmanage.role ; fi", "rosmanage.role")
 	h.setPropsViaSSH("which iperf", "which iperf")
 	h.setPropsViaSSH("which nmap", "which nmap")
-	h.setPropsViaSSH("rosmsg list", "rosmsg list")
-	h.setPropsViaSSH("rospack list", "rospack list")
+	h.setPropsViaSSH("which lshw", "which lshw")
+	h.setPropsViaSSH("which lsusb", "which lsusb")
+	h.setPropsViaSSH("env", "env")
+	if len(h.Props["which lsusb"]) > 0 {
+		h.setPropsViaSSH("lsusb", "lsusb")
+	}
+	if len(h.Props["which lshw"]) > 0 {
+		h.setPropsViaSSH("lshw", "lshw")
+	}
+	//	if strings.Contains(h.Props["env"], "ROS_DISTRO") && strings.Contains(h.Props["env"], "ROS_MASTER_URI") && strings.Contains(h.Props["env"], "ROS_PACKAGE_PATH") {
+	h.setPropsViaSSH(". .bashrc && rosmsg list", "rosmsg list")
+	h.setPropsViaSSH(". .bashrc && rospack list", "rospack list")
+	//	}
 }
 
 func (h *Host) setDynamicOftenProps() {
@@ -164,8 +191,10 @@ func (h *Host) setDynamicOftenProps() {
 	h.LastDynamicOftenUpdate = time.Now()
 	h.setPropsViaSSH("ps aux", "ps aux")
 	h.setPropsViaSSH("uptime", "uptime")
-	h.setPropsViaSSH("rosnode list", "rosnode list")
-	h.setPropsViaSSH("rostopic list", "rostopic list")
+	if strings.Contains(h.Props["env"], "ROS_DISTRO") && strings.Contains(h.Props["env"], "ROS_MASTER_URI") && strings.Contains(h.Props["env"], "ROS_PACKAGE_PATH") {
+		h.setPropsViaSSH("rosnode list", "rosnode list")
+		h.setPropsViaSSH("rostopic list", "rostopic list")
+	}
 }
 
 func (h *Host) setPropsViaSSH(command string, key string) {

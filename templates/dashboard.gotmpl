@@ -274,9 +274,9 @@
 {{ range $k,$v:=(index $.Hosts $.Selected).TerminalHistory }}
 <div class="bs-callout bs-callout-info" id="callout-navbar-breakpoint"> 
 <h4>{{ index (index $.Hosts $.Selected).Props "whoami"}}@{{ index (index $.Hosts $.Selected).Props "hostname"}}:{{ index (index $.Hosts $.Selected).Props "pwd"}}$ {{ $v.Command}}</h4> 
-<p><pre><span class="label label-info">{{$v.Begin}}</span>
+<p><pre>
 {{ $v.Stdout}}
-<span class="label label-info">{{$v.End}}</span>
+<span class="glyphicon glyphicon-time" title="Sent: {{$v.SentTime}} Begin: {{$v.BeginTime}} End: {{$v.EndTime}}"></span>
 </pre></p> 
 </div>
 {{ end }}

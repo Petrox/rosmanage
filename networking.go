@@ -22,6 +22,8 @@ type Network struct {
 // Host contains details of a known remote host
 type Host struct {
 	Addr                   string
+	Iface                  string
+	NetAddr                string
 	IsLocalhost            bool
 	IsPreferred            bool
 	OpenPorts              map[int16]struct{}
@@ -172,6 +174,8 @@ func scanHosts(halo *Network) map[string]*Host {
 			//			log.Println("lineparts", line, lineparts)
 			host.IsLocalhost = strings.HasPrefix(line, "Host: "+networkparts[0]+" ")
 			host.IsPreferred = host.IsLocalhost && networkparts[0] != "127.0.0.1"
+			host.NetAddr = halo.NetAddr
+			host.Iface = halo.Iface
 			host.Addr = lineparts[1]
 			host.Props = make(properties)
 			host.ControlClient.chCommand = make(chan string, 10)
@@ -203,6 +207,15 @@ func scanHosts(halo *Network) map[string]*Host {
 	// log.Printf("%v goodlines\n", goodlines)
 }
 
+func (h *Host) disconnect() bool {
+	_, ok := h.OpenPorts[22]
+	if !ok || h.ControlClient.Active {
+		return false
+	}
+	h.ControlClient.chQuit <- true
+	return true
+}
+
 func (h *Host) startSSHClient() bool {
 	_, ok := h.OpenPorts[22]
 	if !ok || h.ControlClient.Active {
@@ -221,4 +234,34 @@ func (h *Host) stoppedSSHClient() bool {
 	}
 	h.ControlClient.Active = false
 	return true
+}
+
+func (h *Host) InterfacePriority() int {
+	if strings.HasPrefix(h.Iface, "lo") {
+		return 1
+	}
+	if strings.HasPrefix(h.Iface, "wl") {
+		return 2
+	}
+
+	if strings.HasPrefix(h.Iface, "em") {
+		return 3
+	}
+
+	if strings.HasPrefix(h.Iface, "eth") {
+		return 4
+	}
+	return 0
+}
+
+func (h *Host) betterThan(h2 *Host) int {
+	h1pri := h.InterfacePriority()
+	h2pri := h2.InterfacePriority()
+	if h1pri == h2pri {
+		if h.NetAddr == h2.NetAddr {
+			return strings.Compare(h.Addr, h.Addr)
+		}
+		return strings.Compare(h.NetAddr, h2.NetAddr)
+	}
+	return h1pri - h2pri
 }

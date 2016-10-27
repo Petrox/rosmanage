@@ -3,6 +3,7 @@ package main
 import (
 	"log"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/julienschmidt/httprouter"
@@ -17,6 +18,22 @@ type TerminalEvent struct {
 	Stdout   string
 	Stderr   string
 	ExitCode int
+}
+
+func (t *TerminalEvent) BeginTime() string {
+	return t.Begin.Format(time.RFC3339)
+}
+func (t *TerminalEvent) SentTime() string {
+	return t.Sent.Format(time.RFC3339)
+}
+func (t *TerminalEvent) RunTime() string {
+	if t.End.Unix() < t.Begin.Unix() {
+		return strconv.FormatFloat(time.Now().Sub(t.Begin).Seconds(), 0, 1, 64)
+	}
+	return strconv.FormatFloat(t.End.Sub(t.Begin).Seconds(), 0, 1, 64)
+}
+func (t *TerminalEvent) EndTime() string {
+	return t.End.Format(time.RFC3339)
 }
 
 func webterminal(w http.ResponseWriter, r *http.Request, p httprouter.Params) {

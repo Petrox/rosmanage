@@ -67,9 +67,10 @@ func webhost(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 	dashData.Selected = p.ByName("addr")
 	var ok bool
 	dashData.SelectedObj, ok = KnownHosts[dashData.Selected]
-	log.Println(KnownHosts[dashData.Selected].TerminalHistory)
 	if !ok {
-		panic("Not found " + dashData.Selected)
+		//		panic("Not found " + dashData.Selected)
+		w.Write([]byte("Not found, come back later\n"))
+		return
 	}
 	err := dashTemplate.ExecuteTemplate(w, "webhost", dashData)
 	if err != nil {
