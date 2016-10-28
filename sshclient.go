@@ -174,6 +174,7 @@ func (h *Host) setDynamicRareProps() {
 	h.setPropsViaSSH("which lshw", "which lshw")
 	h.setPropsViaSSH("which lsusb", "which lsusb")
 	h.setPropsViaSSH("env", "env")
+	h.setPropsViaSSH("bash -lc env", "bash -c env")
 	if len(h.Props["which lsusb"]) > 0 {
 		h.setPropsViaSSH("lsusb", "lsusb")
 	}
@@ -181,8 +182,9 @@ func (h *Host) setDynamicRareProps() {
 		h.setPropsViaSSH("lshw", "lshw")
 	}
 	//	if strings.Contains(h.Props["env"], "ROS_DISTRO") && strings.Contains(h.Props["env"], "ROS_MASTER_URI") && strings.Contains(h.Props["env"], "ROS_PACKAGE_PATH") {
-	h.setPropsViaSSH(". .bashrc && rosmsg list", "rosmsg list")
-	h.setPropsViaSSH(". .bashrc && rospack list", "rospack list")
+	h.setPropsViaSSH("bash -lc \"rosmsg list\"", "rosmsg list")
+	//	h.setPropsViaSSH("bash -lc \"rosmsg list| while read MSG; do echo $MSG `rosmsg md5 $MSG`; done\"", "rosmsg list md5")
+	h.setPropsViaSSH("bash -lc \"rospack list\"", "rospack list")
 	//	}
 }
 
@@ -217,6 +219,17 @@ func (h *Host) sshCommand(command string) (string, error) {
 		log.Println("SSH session error", h.Addr, err.Error())
 	}
 	defer controlsession.Close()
+	controlsession.Setenv("PS1", "Itssomething")
+	modes := ssh.TerminalModes{
+		ssh.ECHO:          0,     // disable echoing
+		ssh.TTY_OP_ISPEED: 14400, // input speed = 14.4kbaud
+		ssh.TTY_OP_OSPEED: 14400, // output speed = 14.4kbaud
+	}
+
+	if err := controlsession.RequestPty("xterm", 80, 40, modes); err != nil {
+		log.Println("request for pseudo terminal failed: ", err)
+	}
+
 	var b bytes.Buffer
 	controlsession.Stdout = &b
 	if err := controlsession.Run(command); err != nil {
