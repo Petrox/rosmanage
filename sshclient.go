@@ -85,6 +85,7 @@ func (h *Host) sshClientWorker() {
 	h.setStaticProps()
 	h.setDynamicRareProps()
 	h.setDynamicOftenProps()
+	h.rosmsgmd5()
 	for !quit {
 		select {
 		case quit = <-h.ControlClient.chQuit:
@@ -226,7 +227,7 @@ func (h *Host) sshCommand(command string) (string, error) {
 		ssh.TTY_OP_OSPEED: 14400, // output speed = 14.4kbaud
 	}
 
-	if err := controlsession.RequestPty("xterm", 80, 40, modes); err != nil {
+	if err := controlsession.RequestPty("xterm", 400, 40, modes); err != nil {
 		log.Println("request for pseudo terminal failed: ", err)
 	}
 
